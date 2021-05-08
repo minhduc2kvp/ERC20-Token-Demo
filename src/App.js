@@ -2,11 +2,16 @@ import './App.css';
 import { useState, useEffect } from 'react';
 
 
+const Web3 = require('web3');
+const ERC20Token = require("./build/ERC20Token.json");
+const contractAddress = "0xD691bE1F642D3532A160725eb5CE87dBB9864dF4";
+let web3, contract, accounts;
+const Connect = window.uportconnect;
+const uport = new Connect('ERC20 Token', {
+  network: "ropsten"
+});
+
 function App() {
-  const Web3 = require('web3');
-  const ERC20Token = require("./build/ERC20Token.json");
-  const contractAddress = "0xD691bE1F642D3532A160725eb5CE87dBB9864dF4";
-  let web3, contract, accounts;
   const [symbol, setSymbol] = useState();
   const [total, setTotal] = useState();
   const [account, setAccount] = useState();
@@ -19,31 +24,35 @@ function App() {
   const [addressOwner, setAddressOwner] = useState("");
   const [addressReceiver, setAddressReceiver] = useState("");
   const [amountTransfer, setAmountTransfer] = useState(0);
+  const [name, setName] = useState("");
+  const [avatar, setAvatar] = useState("");
+
+  async function login(){
+    web3 = new Web3(uport.getProvider());
+    contract = new web3.eth.Contract(ERC20Token.abi, contractAddress);
+
+    await uport.requestDisclosure({ requested: ['name', 'avatar'],notifications: true });
+    await uport.onResponse('disclosureReq').then(res => {
+      console.log(res);
+      setName(res.payload.name);
+      setAvatar(res.payload.avatar.uri);
+    });
+  
+    await init();
+  }
+
+  async function logout(){
+    await uport.logout();
+    await init();
+  }
 
   async function init() {
-    if (window.ethereum) {
-      window.web3 = new Web3(window.ethereum);
-      await window.ethereum.enable();
-    }
-    else if (window.web3) {
-      window.web3 = new Web3(window.web3.currentProvider);
-    }
-    else {
-      window.alert('Non-Ethereum browser detected. You should consider trying MetaMask!');
-    }
-
-    web3 = window.web3;
     accounts = await web3.eth.getAccounts();
     setAccount(accounts[0]);
-    contract = new web3.eth.Contract(ERC20Token.abi, contractAddress);
     await contract.methods.symbol().call().then(result => setSymbol(result));
     await contract.methods.totalSupply().call().then(result => setTotal(web3.utils.fromWei(result)));
     await contract.methods.balanceOf(accounts[0]).call((err, result) => setBalance(web3.utils.fromWei(result)));
   }
-
-  useEffect(() => {
-    init();
-  });
 
   function handleChangeAddress(event) {
     setAddress(event.target.value);
@@ -61,6 +70,7 @@ function App() {
     await contract.methods.transfer(address, web3.utils.toWei(amount.toString())).send({ from: account })
       .then(result => {
         alert(`transfer success ${result}`);
+        console.log(result);
         setBalance(balance - amount);
       })
       .catch(err => alert(`transfer error ${err}`));
@@ -96,7 +106,19 @@ function App() {
     <div className="container">
       <h1 className="text-center">{symbol} Token</h1>
       <div className="text-center">Contract address: {contractAddress}</div>
+      
       <hr/>
+
+      <div className="d-flex justify-content-between">
+        <div>
+          <img width="50" src={avatar} className="rounded mr-2"/>
+          <span>{name}</span>
+          <button type="button" class={name !== "" ? "btn btn-danger ml-2" : "d-none"} onClick={logout}>Logout Uport</button>
+        </div>
+        <button type="button" class="btn" style={{backgroundColor: "#651fff", color: "white"}} onClick={login}>Uport Login</button>
+      </div>
+      <hr/>
+
       <div className="d-flex justify-content-between">
         <h4 className="text-center">Total: {total} Tokens</h4>
         <div className="d-flex justify-content-between">
